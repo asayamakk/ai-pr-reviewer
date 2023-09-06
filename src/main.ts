@@ -75,8 +75,7 @@ async function run(): Promise<void> {
       // 新しいコメントがついたとき、かつ コメントの中身が /summarize のとき
       process.env.GITHUB_EVENT_NAME === 'issue_comment'
     ) {
-      // @ts-ignore
-      info({msg: 'foo', context: context.payload})
+      info(JSON.stringify(context))
       await codeReview(lightBot, heavyBot, options, prompts)
     } else if (
       process.env.GITHUB_EVENT_NAME === 'pull_request_review_comment'
