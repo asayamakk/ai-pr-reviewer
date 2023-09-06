@@ -1,7 +1,7 @@
 import {
   getBooleanInput,
   getInput,
-  getMultilineInput,
+  getMultilineInput, info,
   setFailed,
   warning
 } from '@actions/core'
@@ -10,6 +10,7 @@ import {OpenAIOptions, Options} from './options'
 import {Prompts} from './prompts'
 import {codeReview} from './review'
 import {handleReviewComment} from './review-comment'
+import { context } from "@actions/github";
 
 async function run(): Promise<void> {
   const options: Options = new Options(
@@ -71,9 +72,11 @@ async function run(): Promise<void> {
   try {
     // check if the event is pull_request
     if (
-      process.env.GITHUB_EVENT_NAME === 'pull_request' ||
-      process.env.GITHUB_EVENT_NAME === 'pull_request_target'
+      // 新しいコメントがついたとき、かつ コメントの中身が /summarize のとき
+      process.env.GITHUB_EVENT_NAME === 'issue_comment'
     ) {
+      // @ts-ignore
+      info({msg: 'foo', context: context.payload})
       await codeReview(lightBot, heavyBot, options, prompts)
     } else if (
       process.env.GITHUB_EVENT_NAME === 'pull_request_review_comment'
