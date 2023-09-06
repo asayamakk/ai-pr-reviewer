@@ -72,10 +72,9 @@ async function run(): Promise<void> {
   try {
     // check if the event is pull_request
     if (
-      // 新しいコメントがついたとき、かつ コメントの中身が /summarize のとき
-      process.env.GITHUB_EVENT_NAME === 'issue_comment'
+      process.env.GITHUB_EVENT_NAME === 'issue_comment' &&
+      context.payload.comment?.body?.includes('/summarize')
     ) {
-      info(JSON.stringify(context))
       await codeReview(lightBot, heavyBot, options, prompts)
     } else if (
       process.env.GITHUB_EVENT_NAME === 'pull_request_review_comment'

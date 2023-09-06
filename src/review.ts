@@ -1,4 +1,4 @@
-import {error, info, warning} from '@actions/core'
+import {getInput, error, info, warning} from '@actions/core'
 // eslint-disable-next-line camelcase
 import {context as github_context} from '@actions/github'
 import pLimit from 'p-limit'
@@ -35,26 +35,32 @@ export const codeReview = async (
   const openaiConcurrencyLimit = pLimit(options.openaiConcurrencyLimit)
   const githubConcurrencyLimit = pLimit(options.githubConcurrencyLimit)
 
+  // const prBaseRef = getInput('pr_base_ref')
+  // const prHeadRef = getInput('pr_head_ref')
+  const prBaseSha = getInput('pr_base_sha')
+  const prHeadSha = getInput('pr_head_sha')
+
   if (
-    context.eventName !== 'pull_request' &&
-    context.eventName !== 'pull_request_target'
+    context.eventName !== 'issue_comment' ||
+    !context.payload.comment?.body?.includes('/summarize')
   ) {
     warning(
-      `Skipped: current event is ${context.eventName}, only support pull_request event`
+      `スキップ: eventName: ${context.eventName}, body: ${context.payload.comment?.body}`
     )
     return
   }
-  if (context.payload.pull_request == null) {
-    warning('Skipped: context.payload.pull_request is null')
+  if (
+    context.payload.issue == null ||
+    context.payload.issue.pull_request == null
+  ) {
+    warning('Skipped: context.payload.issue.pull_request is null')
     return
   }
 
   const inputs: Inputs = new Inputs()
-  inputs.title = context.payload.pull_request.title
-  if (context.payload.pull_request.body != null) {
-    inputs.description = commenter.getDescription(
-      context.payload.pull_request.body
-    )
+  inputs.title = context.payload.issue.title
+  if (context.payload.issue.body != null) {
+    inputs.description = commenter.getDescription(context.payload.issue.body)
   }
 
   // if the description contains ignore_keyword, skip
@@ -69,7 +75,7 @@ export const codeReview = async (
   // get SUMMARIZE_TAG message
   const existingSummarizeCmt = await commenter.findCommentWithTag(
     SUMMARIZE_TAG,
-    context.payload.pull_request.number
+    context.payload.issue.number
   )
   let existingCommitIdsBlock = ''
   let existingSummarizeCmtBody = ''
@@ -94,14 +100,14 @@ export const codeReview = async (
 
   if (
     highestReviewedCommitId === '' ||
-    highestReviewedCommitId === context.payload.pull_request.head.sha
+    highestReviewedCommitId === prHeadSha
   ) {
     info(
       `Will review from the base commit: ${
-        context.payload.pull_request.base.sha as string
+        prBaseSha
       }`
     )
-    highestReviewedCommitId = context.payload.pull_request.base.sha
+    highestReviewedCommitId = prBaseSha
   } else {
     info(`Will review from commit: ${highestReviewedCommitId}`)
   }
@@ -111,15 +117,15 @@ export const codeReview = async (
     owner: repo.owner,
     repo: repo.repo,
     base: highestReviewedCommitId,
-    head: context.payload.pull_request.head.sha
+    head: prHeadSha
   })
 
   // Fetch the diff between the target branch's base commit and the latest commit of the PR branch
   const targetBranchDiff = await octokit.repos.compareCommits({
     owner: repo.owner,
     repo: repo.repo,
-    base: context.payload.pull_request.base.sha,
-    head: context.payload.pull_request.head.sha
+    base: prBaseSha,
+    head: prHeadSha
   })
 
   const incrementalFiles = incrementalDiff.data.files
@@ -174,8 +180,8 @@ export const codeReview = async (
       githubConcurrencyLimit(async () => {
         // retrieve file contents
         let fileContent = ''
-        if (context.payload.pull_request == null) {
-          warning('Skipped: context.payload.pull_request is null')
+        if (context.payload.issue == null) {
+          warning('Skipped: context.payload.issue is null')
           return null
         }
         try {
@@ -183,7 +189,7 @@ export const codeReview = async (
             owner: repo.owner,
             repo: repo.repo,
             path: file.filename,
-            ref: context.payload.pull_request.base.sha
+            ref: prBaseSha
           })
           if (contents.data != null) {
             if (!Array.isArray(contents.data)) {
@@ -265,7 +271,7 @@ ${hunks.oldHunk}
   let statusMsg = `<details>
 <summary>Commits</summary>
 Files that changed from the base of the PR and between ${highestReviewedCommitId} and ${
-    context.payload.pull_request.head.sha
+    prHeadSha
   } commits.
 </details>
 ${
@@ -433,10 +439,7 @@ ${filename}: ${summary}
       let message = '### Summary by CodeRabbit\n\n'
       message += releaseNotesResponse
       try {
-        await commenter.updateDescription(
-          context.payload.pull_request.number,
-          message
-        )
+        await commenter.updateDescription(context.payload.issue.number, message)
       } catch (e: any) {
         warning(`release notes: error from github: ${e.message as string}`)
       }
@@ -551,7 +554,7 @@ ${
 
       let patchesPacked = 0
       for (const [startLine, endLine, patch] of patches) {
-        if (context.payload.pull_request == null) {
+        if (context.payload.issue == null) {
           warning('No pull request found, skipping.')
           continue
         }
@@ -570,7 +573,7 @@ ${
         let commentChain = ''
         try {
           const allChains = await commenter.getCommentChainsWithinRange(
-            context.payload.pull_request.number,
+            context.payload.issue.number,
             filename,
             startLine,
             endLine,
@@ -640,7 +643,7 @@ ${commentChain}
               lgtmCount += 1
               continue
             }
-            if (context.payload.pull_request == null) {
+            if (context.payload.issue == null) {
               warning('No pull request found, skipping.')
               continue
             }
@@ -739,12 +742,12 @@ ${
     // add existing_comment_ids_block with latest head sha
     summarizeComment += `\n${commenter.addReviewedCommitId(
       existingCommitIdsBlock,
-      context.payload.pull_request.head.sha
+      prHeadSha
     )}`
 
     // post the review
     await commenter.submitReview(
-      context.payload.pull_request.number,
+      context.payload.issue.number,
       commits[commits.length - 1].sha,
       statusMsg
     )
@@ -884,6 +887,7 @@ function parseReview(
   let currentStartLine: number | null = null
   let currentEndLine: number | null = null
   let currentComment = ''
+
   function storeReview(): void {
     if (currentStartLine !== null && currentEndLine !== null) {
       const review: Review = {
