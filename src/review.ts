@@ -22,7 +22,7 @@ import {getTokenCount} from './tokenizer'
 const context = github_context
 const repo = context.repo
 
-const ignoreKeyword = '@ai-bot: ignore'
+const ignoreKeyword = 'ai-sensei: ignore'
 
 export const codeReview = async (
   lightBot: Bot,
@@ -726,16 +726,16 @@ ${
 <details>
 <summary>使い方</summary>
 
-### Botにメンションする (\`@ai-bot\`)
+### Chat with Sensei (\`to: ai-sensei\`)
 - Reply on review comments left by this bot to ask follow-up questions. A review comment is a comment on a diff or a file.
-- Invite the bot into a review comment chain by tagging \`@ai-bot\` in a reply.
+- Invite the bot into a review comment chain by tagging \`to: ai-sensei\` in a reply.
 
 ### Code suggestions
 - The bot may make code suggestions, but please review them carefully before committing since the line number ranges may be misaligned. 
 - You can edit the comment made by the bot and manually tweak the suggestion if it is slightly off.
 
 ### Pausing incremental reviews
-- Add \`@ai-bot: ignore\` anywhere in the PR description to pause further reviews from the bot.
+- Add \`to: ai-sensei: ignore\` anywhere in the PR description to pause further reviews from the bot.
 
 </details>
 `
