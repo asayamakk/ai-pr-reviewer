@@ -7,10 +7,10 @@ author: 'CodeRabbit LLC'
 inputs:
   pr_base_sha:
     required: true
-    description: 'The base sha of the pull request. This should be passed via ${{ steps.comment-branch.outputs.base_sha }}'
+    description: 'The base sha of the pull request.'
   pr_head_sha:
     required: true
-    description: 'The head sha of the pull request. This should be passed via ${{ steps.comment-branch.outputs.head_sha }}'
+    description: 'The head sha of the pull request.'
   debug:
     required: false
     description: 'Enable debug mode'
